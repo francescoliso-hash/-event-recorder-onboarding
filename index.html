@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="referrer" content="no-referrer">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-V0GCdBr105V4rMuPPWwfctlOoV0VLsmt2J57i50yES0='; style-src 'sha256-OZUKTfoq8s+Z5Hea4MyQL3Zw3HmmvQ5hXnOnri6928o='; connect-src https://jvstdxxgdubogqpfiavu.supabase.co; img-src data:; base-uri 'none'; form-action 'none'; object-src 'none'">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-Y6NSZsjgiN68tRvd2JF3WOyekBfxi6HoV3TkTXmLqrE='; style-src 'sha256-OZUKTfoq8s+Z5Hea4MyQL3Zw3HmmvQ5hXnOnri6928o='; connect-src https://jvstdxxgdubogqpfiavu.supabase.co; img-src data:; base-uri 'none'; form-action 'none'; object-src 'none'">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <script>(() => {
   "use strict";
@@ -31,6 +31,9 @@
     const submit = document.getElementById("submit");
     const password = document.getElementById("password");
     const confirmation = document.getElementById("confirmation");
+    const eyebrow = document.getElementById("eyebrow");
+    const title = document.getElementById("title");
+    const introduction = document.getElementById("introduction");
 
     const showError = (message) => {
       status.className = "status error";
@@ -39,12 +42,25 @@
 
     if (!syntacticallyValid) {
       tokenHash = null;
-      showError("Il collegamento non è valido o è scaduto. Chiedi al supervisore un nuovo invito.");
+      showError("Il collegamento non è valido o è scaduto. Richiedi un nuovo link dall’app oppure contatta il supervisore.");
       return;
     }
 
+    const isRecovery = flowType === "recovery";
+    eyebrow.textContent = isRecovery
+      ? "EVENT RECORDER / RECUPERO PASSWORD"
+      : "EVENT RECORDER / INVITO";
+    title.textContent = isRecovery
+      ? "Scegli una nuova password"
+      : "Completa l’attivazione";
+    introduction.textContent = isRecovery
+      ? "Aggiorna la password del tuo account già attivo. Ruolo, équipe e assegnazioni non vengono modificati."
+      : "Imposta una password personale. Il collegamento non assegna ruoli o équipe: l’associazione è già stata autorizzata dal supervisore.";
+    submit.textContent = isRecovery ? "Aggiorna password" : "Attiva account";
     form.hidden = false;
-    status.textContent = "Scegli una password di almeno 12 caratteri per verificare e completare l’invito.";
+    status.textContent = isRecovery
+      ? "Scegli una password di almeno 12 caratteri."
+      : "Scegli una password di almeno 12 caratteri per verificare e completare l’invito.";
 
     form.addEventListener("submit", async (event) => {
       event.preventDefault();
@@ -103,31 +119,37 @@
         confirmation.value = "";
         if (!update.ok) throw new Error("PASSWORD_UPDATE_FAILED");
 
-        const acceptance = await fetch(projectUrl + "/functions/v1/team-admin", {
-          method: "POST",
-          headers: {
-            "apikey": publishableKey,
-            "authorization": "Bearer " + accessToken,
-            "content-type": "application/json"
-          },
-          body: JSON.stringify({ action: "accept" }),
-          cache: "no-store",
-          credentials: "omit"
-        });
-        if (!acceptance.ok) throw new Error("INVITATION_ACCEPT_FAILED");
+        if (!isRecovery) {
+          const acceptance = await fetch(projectUrl + "/functions/v1/team-admin", {
+            method: "POST",
+            headers: {
+              "apikey": publishableKey,
+              "authorization": "Bearer " + accessToken,
+              "content-type": "application/json"
+            },
+            body: JSON.stringify({ action: "accept" }),
+            cache: "no-store",
+            credentials: "omit"
+          });
+          if (!acceptance.ok) throw new Error("INVITATION_ACCEPT_FAILED");
+        }
 
         accessToken = null;
         form.hidden = true;
         status.className = "status success";
-        status.textContent = "Account attivato. Ora puoi aprire Event Recorder e accedere con email e password.";
+        status.textContent = isRecovery
+          ? "Password aggiornata. Ora puoi aprire Event Recorder e accedere."
+          : "Account attivato. Ora puoi aprire Event Recorder e accedere con email e password.";
       } catch (_) {
         if (rejectedLink) {
           password.value = "";
           confirmation.value = "";
           form.hidden = true;
-          showError("Il collegamento non è valido o è scaduto. Chiedi al supervisore un nuovo invito.");
+          showError("Il collegamento non è valido o è scaduto. Richiedi un nuovo link dall’app oppure contatta il supervisore.");
         } else {
-          showError("Non è stato possibile completare l’attivazione. Riprova senza chiudere questa pagina oppure chiedi un nuovo invito.");
+          showError(isRecovery
+            ? "Non è stato possibile aggiornare la password. Riprova senza chiudere questa pagina oppure richiedi un nuovo link dall’app."
+            : "Non è stato possibile completare l’attivazione. Riprova senza chiudere questa pagina oppure chiedi un nuovo invito.");
           submit.disabled = false;
         }
       }
@@ -153,15 +175,15 @@ button[disabled]{opacity:.55;cursor:wait}.status{min-height:3em;margin-top:18px}
 </head>
 <body>
 <main>
-  <p class="eyebrow">EVENT RECORDER / INVITO</p>
-  <h1>Completa l’attivazione</h1>
-  <p>Imposta una password personale. Il collegamento non assegna ruoli o équipe: l’associazione è già stata autorizzata dal supervisore.</p>
+  <p id="eyebrow" class="eyebrow">EVENT RECORDER / ACCESSO</p>
+  <h1 id="title">Imposta la password</h1>
+  <p id="introduction">Scegli una password personale per il tuo account Event Recorder.</p>
   <form id="activation" hidden novalidate>
     <label for="password">Nuova password</label>
     <input id="password" name="password" type="password" autocomplete="new-password" minlength="12" required>
     <label for="confirmation">Conferma password</label>
     <input id="confirmation" name="confirmation" type="password" autocomplete="new-password" minlength="12" required>
-    <button id="submit" type="submit">Attiva account</button>
+    <button id="submit" type="submit">Salva password</button>
   </form>
   <p id="status" class="status" role="status" aria-live="polite">Verifica del collegamento…</p>
 </main>
